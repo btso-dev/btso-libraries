@@ -98,4 +98,87 @@ fc::variant_object get_config()
    return result;
 }
 
+namespace graphene { namespace chain {
+namespace detail {
+   // TODO review and remove code below and links to it after hf_1268
+   void check_asset_options_hf_1268(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if( block_time < HARDFORK_1268_TIME )
+      {
+         FC_ASSERT( !options.extensions.value.reward_percent.valid(),
+            "Asset extension reward percent is only available after HARDFORK_1268_TIME!");
+
+         FC_ASSERT( !options.extensions.value.whitelist_market_fee_sharing.valid(),
+            "Asset extension whitelist_market_fee_sharing is only available after HARDFORK_1268_TIME!");
+      }
+   }
+}
+
+void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
+{ try {
+
+   database& d = db();
+
+   const auto& chain_parameters = d.get_global_properties().parameters;
+   FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
+   FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
+
+   detail::check_asset_options_hf_1268(d.head_block_time(), op.common_options);
+
+   // Check that all authorities do exist
+   for( auto id : op.common_options.whitelist_authorities )
+      d.get_object(id);
+   for( auto id : op.common_options.blacklist_authorities )
+      d.get_object(id);
+
+   auto& asset_indx = d.get_index_type<asset_index>().indices().get<by_symbol>();
+   auto asset_symbol_itr = asset_indx.find( op.symbol );
+   FC_ASSERT( asset_symbol_itr == asset_indx.end() );
+
+   if( d.head_block_time() > HARDFORK_385_TIME )
+   {
+      auto dotpos = op.symbol.rfind( '.' );
+      if( dotpos != std::string::npos )
+      {
+         auto prefix = op.symbol.substr( 0, dotpos );
+         auto asset_symbol_itr = asset_indx.find( prefix );
+         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
+                    ("s",op.symbol)("p",prefix) );
+         FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
+                    ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
+      }
+   }
+   else
+   {
+      auto dotpos = op.symbol.find( '.' );
+      if( dotpos != std::string::npos )
+          wlog( "Asset ${s} has a name which requires hardfork 385", ("s",op.symbol) );
+   }
+
+   if( op.bitasset_opts )
+   {
+      const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
+      if( backing.is_market_issued() )
+      {
+         const asset_bitasset_data_object& backing_bitasset_data = backing.bitasset_data(d);
+         const asset_object& backing_backing = backing_bitasset_data.options.short_backing_asset(d);
+         FC_ASSERT( !backing_backing.is_market_issued(),
+                    "May not create a bitasset backed by a bitasset backed by a bitasset." );
+         FC_ASSERT( op.issuer != GRAPHENE_COMMITTEE_ACCOUNT || backing_backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      } else
+         FC_ASSERT( op.issuer != GRAPHENE_COMMITTEE_ACCOUNT || backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
+                 op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
+   }
+   if( op.is_prediction_market )
+   {
+      FC_ASSERT( op.bitasset_opts );
+      FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
+   }
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
+
 } } // graphene::chain
