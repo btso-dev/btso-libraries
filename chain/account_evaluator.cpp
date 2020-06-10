@@ -55,6 +55,14 @@ void verify_authority_accounts( const database& db, const authority& a )
    }
 }
 
+void account_balance_object::adjust_balance(const asset& delta)
+{
+   assert(delta.asset_id == asset_type);
+   balance += delta.amount;
+   if( asset_type == asset_id_type() ) // CORE asset
+      maintenance_flag = true;
+}
+
 void verify_account_votes( const database& db, const account_options& options )
 {
    // ensure account's votes satisfy requirements
