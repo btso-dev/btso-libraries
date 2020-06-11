@@ -189,6 +189,24 @@ void account_member_index::about_to_modify(const object& before)
    before_account_members = get_account_members(a);
 }
 
+void_result assert_evaluator::do_evaluate( const assert_operation& o )
+{ try {
+   const database& _db = db();
+   uint32_t skip = _db.get_node_properties().skip_flags;
+   auto max_predicate_opcode = _db.get_global_properties().parameters.max_predicate_opcode;
+
+   if( skip & database::skip_assert_evaluation )
+      return void_result();
+
+   for( const auto& p : o.predicates )
+   {
+      FC_ASSERT( p.which() >= 0 );
+      FC_ASSERT( unsigned(p.which()) < max_predicate_opcode );
+      p.visit( predicate_evaluator( _db ) );
+   }
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 void account_member_index::object_modified(const object& after)
 {
     assert( dynamic_cast<const account_object*>(&after) ); // for debug only
