@@ -69,6 +69,13 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+void asset_create_evaluator::pay_fee()
+{
+   fee_is_odd = core_fee_paid.value & 1;
+   core_fee_paid -= core_fee_paid.value/2;
+   generic_evaluator::pay_fee();
+}
+
 void_result assert_evaluator::do_apply( const assert_operation& o )
 { try {
    // assert_operation is always a no-op
