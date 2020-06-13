@@ -124,6 +124,21 @@ void asset_create_evaluator::pay_fee()
    generic_evaluator::pay_fee();
 }
 
+string asset_object::amount_to_string(share_type amount) const
+{
+   share_type scaled_precision = asset::scaled_precision( precision );
+
+   string result = fc::to_string(amount.value / scaled_precision.value);
+   auto decimals = abs( amount.value % scaled_precision.value );
+   if( decimals )
+   {
+      if( amount < 0 && result == "0" )
+         result = "-0";
+      result += "." + fc::to_string(scaled_precision.value + decimals).erase(0,1);
+   }
+   return result;
+}
+
 object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op )
 { try {
    database& d = db();
