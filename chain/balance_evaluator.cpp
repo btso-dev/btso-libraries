@@ -68,6 +68,25 @@ void_result balance_claim_evaluator::do_evaluate(const balance_claim_operation& 
    return {};
 }
 
+void block_database::remove( const block_id_type& id )
+{ try {
+   index_entry e;
+   int64_t index_pos = sizeof(e) * int64_t(block_header::num_from_id(id));
+   _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
+   if ( _block_num_to_pos.tellg() <= index_pos )
+      FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
+
+   _block_num_to_pos.seekg( index_pos );
+   _block_num_to_pos.read( (char*)&e, sizeof(e) );
+
+   if( e.block_id == id )
+   {
+      e.block_size = 0;
+      _block_num_to_pos.seekp( sizeof(e) * int64_t(block_header::num_from_id(id)) );
+      _block_num_to_pos.write( (char*)&e, sizeof(e) );
+   }
+} FC_CAPTURE_AND_RETHROW( (id) ) }
+
 /**
  * @note the fee is always 0 for this particular operation because once the
  * balance is claimed it frees up memory and it cannot be used to spam the network
