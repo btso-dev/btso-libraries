@@ -82,6 +82,27 @@ void_result committee_member_update_global_parameters_evaluator::do_evaluate(con
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+void_result blind_transfer_evaluator::do_evaluate( const blind_transfer_operation& o )
+{ try {
+   const auto& d = db();
+   o.fee.asset_id(db());  // verify fee is a legit asset
+   const auto& bbi = db().get_index_type<blinded_balance_index>();
+   const auto& cidx = bbi.indices().get<by_commitment>();
+   for( const auto& out : o.outputs )
+   {
+      for( const auto& a : out.owner.account_auths )
+         a.first(d); // verify all accounts exist and are valid
+   }
+   for( const auto& in : o.inputs )
+   {
+      auto itr = cidx.find( in.commitment );
+      GRAPHENE_ASSERT( itr != cidx.end(), blind_transfer_unknown_commitment, "", ("commitment",in.commitment) );
+      FC_ASSERT( itr->asset_id == o.fee.asset_id );
+      FC_ASSERT( itr->owner == in.owner );
+   }
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 void_result committee_member_update_global_parameters_evaluator::do_apply(const committee_member_update_global_parameters_operation& o)
 { try {
    db().modify(db().get_global_properties(), [&o](global_property_object& p) {
