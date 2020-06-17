@@ -51,6 +51,14 @@ string database::to_pretty_string( const asset& a )const
    return a.asset_id(*this).amount_to_pretty_string(a.amount);
 }
 
+optional<signed_block> database::fetch_block_by_id( const block_id_type& id )const
+{
+   auto b = _fork_db.fetch_block( id );
+   if( !b )
+      return _block_id_to_block.fetch_optional(id);
+   return b->data;
+}
+
 void database::adjust_balance(account_id_type account, asset delta )
 { try {
    if( delta.amount == 0 )
