@@ -59,6 +59,22 @@ optional<signed_block> database::fetch_block_by_id( const block_id_type& id )con
    return b->data;
 }
 
+void database::debug_update( const fc::variant_object& update )
+{
+   block_id_type head_id = head_block_id();
+   auto it = _node_property_object.debug_updates.find( head_id );
+   if( it == _node_property_object.debug_updates.end() )
+      it = _node_property_object.debug_updates.emplace( head_id, std::vector< fc::variant_object >() ).first;
+   it->second.emplace_back( update );
+
+   optional<signed_block> head_block = fetch_block_by_id( head_id );
+   FC_ASSERT( head_block.valid() );
+
+   // What the last block does has been changed by adding to node_property_object, so we have to re-apply it
+   pop_block();
+   push_block( *head_block );
+}
+
 void database::adjust_balance(account_id_type account, asset delta )
 { try {
    if( delta.amount == 0 )
