@@ -207,4 +207,9 @@ void database::debug_update( const fc::variant_object& update )
    push_block( *head_block );
 }
 
+const chain_property_object& database::get_chain_properties()const
+{
+   return *_p_chain_property_obj;
+}
+
 } }
