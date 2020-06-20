@@ -75,6 +75,23 @@ void database::debug_update( const fc::variant_object& update )
    push_block( *head_block );
 }
 
+void database::update_worker_votes()
+{
+   const auto& idx = get_index_type<worker_index>().indices().get<by_account>();
+   auto itr = idx.begin();
+   auto itr_end = idx.end();
+   bool allow_negative_votes = (head_block_time() < HARDFORK_607_TIME);
+   while( itr != itr_end )
+   {
+      modify( *itr, [this,allow_negative_votes]( worker_object& obj )
+      {
+         obj.total_votes_for = _vote_tally_buffer[obj.vote_for];
+         obj.total_votes_against = allow_negative_votes ? _vote_tally_buffer[obj.vote_against] : 0;
+      });
+      ++itr;
+   }
+}
+
 void database::adjust_balance(account_id_type account, asset delta )
 { try {
    if( delta.amount == 0 )
