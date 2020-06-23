@@ -170,6 +170,21 @@ void database::wipe(const fc::path& data_dir, bool include_blocks)
       fc::remove_all( data_dir / "database" );
 }
 
+void database::cancel_settle_order(const force_settlement_object& order, bool create_virtual_op)
+{
+   adjust_balance(order.owner, order.balance);
+
+   if( create_virtual_op )
+   {
+      asset_settle_cancel_operation vop;
+      vop.settlement = order.id;
+      vop.account = order.owner;
+      vop.amount = order.balance;
+      push_applied_operation( vop );
+   }
+   remove(order);
+}
+
 void database::open(
    const fc::path& data_dir,
    std::function<genesis_state_type()> genesis_loader,
